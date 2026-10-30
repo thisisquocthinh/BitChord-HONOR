@@ -172,7 +172,8 @@ android {
             )
             // Null without a keystore to sign with: the build then produces
             // app-release-unsigned.apk instead of failing outright.
-            signingConfig = signingConfigs.findByName("release")
+            // shortcut: no release keystore on this fork, so sign with the debug key; replace before any store release.
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
         /*
          * The release build, installable next to the dev and prod apps: same R8,
@@ -330,6 +331,10 @@ dependencies {
         isTransitive = false
     }
     implementation("androidx.palette:palette-ktx:1.0.0")
+
+    // ---- HONOR Translucent Component Kit 11.0.0.134 (native liquid glass on HONOR) ----
+    implementation(files("libs/hnvisualeffect-11.0.0.134.aar"))
+    implementation("androidx.annotation:annotation:1.9.1")
 
     // ---- Frosted glass / progressive blur (Telegram-style bars) ----
     implementation("dev.chrisbanes.haze:haze:1.3.1")

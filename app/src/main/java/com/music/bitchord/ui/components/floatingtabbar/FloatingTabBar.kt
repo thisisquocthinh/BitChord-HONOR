@@ -58,6 +58,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Indication
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -114,7 +115,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.ui.components.GlassSpring
+import com.music.bitchord.ui.components.HonorGlassLayer
 import com.music.bitchord.ui.components.LocalGlassExport
+import com.music.bitchord.ui.components.LocalHonorGlass
 import com.music.bitchord.ui.components.backdrop.backdrops.layerBackdrop
 import com.music.bitchord.ui.components.backdrop.backdrops.rememberLayerBackdrop
 import com.music.bitchord.ui.components.isGlassSupported
@@ -515,8 +518,9 @@ private fun SharedTransitionScope.InlineTab(
                 indication = inlineTab.indication?.invoke(),
                 interactionSource = remember { MutableInteractionSource() }
             )
-            .padding(sizes.tabInlineContentPadding)
     ) {
+        if (LocalHonorGlass.current) HonorGlassLayer(modifier = Modifier.matchParentSize())
+        Box(Modifier.padding(sizes.tabInlineContentPadding)) {
         Tab(
             icon = {
                 Box(
@@ -532,6 +536,7 @@ private fun SharedTransitionScope.InlineTab(
             title = { inlineTab.title() },
             isInline = true
         )
+        }
     }
 }
 
@@ -545,11 +550,7 @@ private fun SharedTransitionScope.InlineStandaloneTab(
     modifier: Modifier,
     tabBarContentModifier: @Composable () -> Modifier
 ) {
-    Tab(
-        icon = standaloneTab.icon,
-        title = standaloneTab.title,
-        isInline = true,
-        isStandalone = true,
+    Box(
         modifier = modifier
             .sharedElement(
                 sharedContentState = rememberSharedContentState("standaloneTab"),
@@ -571,7 +572,16 @@ private fun SharedTransitionScope.InlineStandaloneTab(
                 indication = standaloneTab.indication?.invoke(),
                 interactionSource = remember { MutableInteractionSource() }
             )
-    )
+    ) {
+        if (LocalHonorGlass.current) HonorGlassLayer(modifier = Modifier.matchParentSize())
+        Tab(
+            icon = standaloneTab.icon,
+            title = standaloneTab.title,
+            isInline = true,
+            isStandalone = true,
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
 }
 
 @Composable
@@ -761,7 +771,9 @@ private fun SharedTransitionScope.ExpandedTabs(
     pill.reduceMotion = reduceAnimation
     // The lens samples the recorded page, and "reduce dynamic blur" stops that
     // recording. There the flat pill carries the whole motion on its own.
-    val glassPill = isGlassSupported() && !reduceDynamicBlur
+    val honorGlass = LocalHonorGlass.current
+    // HONOR's glass is drawn by the system, so there is no exported backdrop for the lens to refract.
+    val glassPill = isGlassSupported() && !reduceDynamicBlur && !honorGlass
     val barGlass = rememberLayerBackdrop()
     val tabRow = rememberLayerBackdrop()
 
@@ -848,9 +860,9 @@ private fun SharedTransitionScope.ExpandedTabs(
                     )
                     .clip(shapes.tabBarShape)
                     .then(tabBarContentModifier())
-                    .padding(contentPadding)
-                    .animateContentSize()
             ) {
+              if (honorGlass) HonorGlassLayer(modifier = Modifier.matchParentSize())
+              Box(Modifier.padding(contentPadding).animateContentSize()) {
                 if (showPill && (!glassPill || pill.isFlat)) {
                     FlatSelectionPill(
                         color = colors.indicatorColor,
@@ -858,8 +870,12 @@ private fun SharedTransitionScope.ExpandedTabs(
                             .matchParentSize()
                             .pillPlacement(
                                 center = { pillCenterInRow(pill.position) },
-                                size = { pill.liveSize(restSize, liftedSize) },
-                            ),
+                                // Lifted it would be clipped by the bar's edge, so on HONOR glass it
+                                // keeps its size and only travels with the finger.
+                                size = { if (honorGlass) restSize else pill.liveSize(restSize, liftedSize) },
+                            )
+                            // The lens overlay takes over while held; two stacked pills read as two glass layers.
+                            .graphicsLayer { if (honorGlass) alpha = 1f - pill.glassPresence.coerceIn(0f, 1f) },
                     )
                 }
 
@@ -976,7 +992,25 @@ private fun SharedTransitionScope.ExpandedTabs(
                         )
                     }
                 }
+              }
             }
+        }
+
+        // HONOR glass cannot be refracted by the app, so the lifted lens is a clear pill with a
+        // bright rim drawn over the bar, outside its clip, and free to stand past the bar's edges.
+        if (honorGlass && showPill && pill.glassPresence > 0.01f) {
+            val lensShape = remember { RoundedCornerShape(percent = 50) }
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .pillPlacement(
+                        center = { pillCenterInRow(pill.position) + Offset(padLeftPx, padTopPx) },
+                        size = { pill.liveSize(restSize, liftedSize) },
+                    )
+                    .graphicsLayer { alpha = pill.glassPresence.coerceIn(0f, 1f) }
+                    .background(androidx.compose.ui.graphics.Color.White.copy(alpha = 0.12f), lensShape)
+                    .border(1.5.dp, androidx.compose.ui.graphics.Color.White.copy(alpha = 0.8f), lensShape),
+            )
         }
 
         if (glassPill && showPill && !pill.isFlat) {
@@ -1006,11 +1040,7 @@ private fun SharedTransitionScope.ExpandedStandaloneTab(
     modifier: Modifier,
     tabBarContentModifier: @Composable () -> Modifier
 ) {
-    Tab(
-        icon = standaloneTab.icon,
-        title = standaloneTab.title,
-        isInline = false,
-        isStandalone = true,
+    Box(
         modifier = modifier
             .sharedElement(
                 sharedContentState = rememberSharedContentState("standaloneTab"),
@@ -1032,7 +1062,16 @@ private fun SharedTransitionScope.ExpandedStandaloneTab(
                 indication = standaloneTab.indication?.invoke(),
                 interactionSource = remember { MutableInteractionSource() }
             )
-    )
+    ) {
+        if (LocalHonorGlass.current) HonorGlassLayer(modifier = Modifier.matchParentSize())
+        Tab(
+            icon = standaloneTab.icon,
+            title = standaloneTab.title,
+            isInline = false,
+            isStandalone = true,
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
 }
 
 @Composable

@@ -530,6 +530,9 @@ private fun BitChordApp(
     // Recording the backdrop layer costs a draw pass, so it only runs when a
     // liquid-glass surface (the nav bar or artwork-page back button) can sample it.
     val glassActive = LocalLiquidGlassEnabled.current && isGlassSupported()
+    // On HONOR the folding nav bar is always used, drawn with the system's own glass
+    // (no backdrop recording), whether or not the app's Liquid Glass switch is on.
+    val honorNav = com.music.bitchord.ui.components.isHonorGlassSupported(androidx.compose.ui.platform.LocalContext.current)
     // "Reduce dynamic blur" keeps the glass bar's *shape* — the folding
     // now-playing-and-tabs component is a layout, not an effect, and dropping
     // back to the two stacked bars would be answering a question about material
@@ -2847,7 +2850,7 @@ private fun BitChordApp(
                     modifier = Modifier
                         .hazeSource(hazeState)
                         .then(
-                            if (glassActive) {
+                            if (glassActive || honorNav) {
                                 Modifier
                                     // Not under "reduce dynamic blur": nothing
                                     // samples the layer then, and recording a
@@ -4118,7 +4121,7 @@ private fun BitChordApp(
                     }
                 }
 
-                if (glassActive) Column(
+                if (glassActive || honorNav) Column(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .widthIn(max = FLOATING_BAR_MAX_WIDTH)

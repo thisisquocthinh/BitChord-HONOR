@@ -1,7 +1,18 @@
 package com.music.bitchord.ui.components
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.activity.compose.BackHandler
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Box
@@ -86,9 +97,24 @@ fun AccountProfileSelector(
             fallbackTint = material.fallbackTint,
         )
     }
+    val honor = rememberHonorGlass()
+    var glassDark by remember { mutableStateOf(false) }
+    // Blooms out of the avatar at the top right; the glass has no open animation of its own.
+    val open = remember { Animatable(0f) }
+    LaunchedEffect(Unit) { open.animateTo(1f, spring(dampingRatio = 0.8f, stiffness = 900f)) }
+    // Closing shrinks back into the avatar before the caller removes the selector.
+    val scope = rememberCoroutineScope()
+    var closing by remember { mutableStateOf(false) }
+    val dismiss: () -> Unit = {
+        if (!closing) {
+            closing = true
+            scope.launch { open.animateTo(0f, tween(200, easing = FastOutLinearInEasing)); onDismiss() }
+        }
+    }
+    BackHandler(onBack = dismiss)
     Column(
-        modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.scrim.copy(alpha = .48f))
-            .clickable(onClick = onDismiss),
+        modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.scrim.copy(alpha = (if (honor) .06f else .48f) * open.value.coerceIn(0f, 1f)))
+            .clickable(onClick = dismiss),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Surface(
@@ -98,10 +124,19 @@ fun AccountProfileSelector(
             modifier = Modifier
                 .padding(top = 56.dp, start = 20.dp, end = 20.dp)
                 .fillMaxWidth()
+                .graphicsLayer {
+                    val t = open.value
+                    transformOrigin = TransformOrigin(0.94f, 0.02f)
+                    scaleX = 0.15f + 0.85f * t
+                    scaleY = 0.15f + 0.85f * t
+                    alpha = (t * 2f).coerceIn(0f, 1f)
+                }
                 .clip(shape)
                 .then(
                     if (reduceDynamicBlur) {
                         Modifier.background(MaterialTheme.colorScheme.surface)
+                    } else if (honor) {
+                        Modifier
                     } else {
                         Modifier.optimizedHazeEffect(
                             state = hazeState,
@@ -119,6 +154,16 @@ fun AccountProfileSelector(
                 )
                 .clickable(onClick = {}),
         ) {
+            Box {
+            if (honor) {
+                HonorGlassLayer(
+                    radiusPx = with(androidx.compose.ui.platform.LocalDensity.current) { 28.dp.roundToPx() },
+                    modifier = Modifier.matchParentSize(),
+                    small = false,
+                    onDarkChanged = { glassDark = it },
+                )
+            }
+            HonorContentTheme(honor && glassDark) {
             // Room under the last row to match the space between rows, so the
             // list doesn't stop short against the card's edge.
             LazyColumn(contentPadding = PaddingValues(bottom = 14.dp)) {
@@ -135,13 +180,15 @@ fun AccountProfileSelector(
                 items(account.profiles.size) { index ->
                     val profile = account.profiles[index]
                     ProfileRow(profile, account.accountId == activeAccountId && profile.profileId == activeProfileId,
-                        managing, { onSelect(account, profile); onDismiss() }, { onRemoveAccount(account) })
+                        managing, { onSelect(account, profile); dismiss() }, { onRemoveAccount(account) })
                 }
                 }
                 item { SelectorAction(SfIcons.AddAccount, stringResource(R.string.add_account), onClick = onAddAccount) }
                 // A wide glyph — two people and a gear — drawn a size up to match the others.
                 item { SelectorAction(SfIcons.ManageAccounts, stringResource(R.string.manage_accounts), iconSize = 28.dp) { managing = !managing } }
                 item { SelectorAction(SfIcons.Settings, stringResource(R.string.settings), onClick = onOpenSettings) }
+            }
+            }
             }
         }
     }

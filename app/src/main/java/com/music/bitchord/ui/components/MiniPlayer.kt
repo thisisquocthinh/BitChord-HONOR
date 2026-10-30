@@ -32,6 +32,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -372,6 +374,8 @@ fun MiniPlayer(
     // a pill instead of a rounded rectangle. Same idiom as [FloatingBottomBar]
     // directly below it, so the two shapes are the same family.
     val shape = RoundedCornerShape(percent = 50)
+    val honor = rememberHonorGlass()
+    var glassDark by remember { mutableStateOf(false) }
     Box(
         modifier = modifier
             .padding(horizontal = BAR_GUTTER)
@@ -393,6 +397,8 @@ fun MiniPlayer(
             .then(
                 if (reduceDynamicBlur) {
                     Modifier.background(MaterialTheme.colorScheme.surface)
+                } else if (honor) {
+                    Modifier
                 } else {
                     Modifier.optimizedHazeEffect(
                         state = hazeState,
@@ -406,6 +412,13 @@ fun MiniPlayer(
             // its own confirmation. The glyphs on it still buzz.
             .clickable(onClick = onExpand),
     ) {
+        if (honor) {
+            HonorGlassLayer(
+                modifier = Modifier.matchParentSize(),
+                onDarkChanged = { glassDark = it },
+            )
+        }
+        HonorContentTheme(honor && glassDark) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -505,6 +518,7 @@ fun MiniPlayer(
                         .copy(alpha = if (controlsLocked) 0.3f else 1f),
                 )
             }
+        }
         }
     }
 }

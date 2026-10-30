@@ -77,15 +77,19 @@ internal fun AudioPopupCard(
             ),
         contentAlignment = Alignment.Center,
     ) {
-        Column(
+        val honor = rememberHonorGlass()
+        GlassColumn(
+            honor = honor,
+            radius = ALERT_CORNER,
             modifier = Modifier
                 .width(POPUP_WIDTH)
                 .clip(POPUP_CARD_SHAPE)
                 .then(
                     // The ⋯ menu's frost — see [PlayerDrawer], whose drawers
-                    // these popups open from.
+                    // these popups open from. On HONOR the glass layer is the fill.
                     when {
                         reduceDynamicBlur -> Modifier.background(MenuFrostDark)
+                        honor -> Modifier
                         frost != null -> with(frost) {
                             Modifier.frostPanel(POPUP_CARD_SHAPE, MenuFrostDark.copy(alpha = MENU_FROST_ALPHA))
                         }

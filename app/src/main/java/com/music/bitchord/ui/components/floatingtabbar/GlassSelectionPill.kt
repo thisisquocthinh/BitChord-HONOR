@@ -34,6 +34,7 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.DpOffset
+import androidx.compose.foundation.border
 import androidx.compose.ui.unit.dp
 import com.music.bitchord.ui.components.LocalAppBackdrop
 import com.music.bitchord.ui.components.backdrop.Backdrop
@@ -502,7 +503,13 @@ internal fun FlatSelectionPill(
     modifier: Modifier,
 ) {
     val shape = remember { RoundedCornerShape(percent = 50) }
-    Box(modifier.background(color, shape))
+    // On HONOR glass a bare fill reads as a grey plate; a thin light rim makes it a lens.
+    val rim = if (com.music.bitchord.ui.components.LocalHonorGlass.current) {
+        Modifier.border(1.dp, Color.White.copy(alpha = 0.35f), shape)
+    } else {
+        Modifier
+    }
+    Box(modifier.background(color, shape).then(rim))
 }
 
 /**

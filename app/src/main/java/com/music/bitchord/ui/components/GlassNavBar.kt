@@ -40,6 +40,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
@@ -132,9 +134,14 @@ fun GlassNavBar(
 
     // A factory, not a value — see the note in FloatingTabBar's header. Each of
     // the three surfaces gets its own glass modifier and so its own shape cache.
-    // The theme's own glass tint, as the liquid top bar has it — no white wash.
-    val glassSurface: @Composable () -> Modifier = { Modifier.liquidGlass(shape = pillShape) }
+    val honor = rememberHonorGlass()
+    val glassSurface: @Composable () -> Modifier = {
+        // On HONOR the surfaces are system glass layers inside each container, not a modifier.
+        // Elsewhere: the theme's own glass tint, as the liquid top bar has it — no white wash.
+        if (honor) Modifier else Modifier.liquidGlass(shape = pillShape)
+    }
 
+    androidx.compose.runtime.CompositionLocalProvider(LocalHonorGlass provides honor) {
     FloatingTabBar(
         selectedTabKey = selectedIndex,
         scrollConnection = scrollConnection,
@@ -275,6 +282,7 @@ fun GlassNavBar(
             }
         }
     }
+    }
 }
 
 /**
@@ -308,6 +316,9 @@ private fun GlassNowPlaying(
     pull: MiniPlayerPull?,
     modifier: Modifier = Modifier,
 ) {
+    val honor = LocalHonorGlass.current
+    var glassDark by remember { mutableStateOf(false) }
+    val contentColor = if (honor && glassDark) Color.White else contentColor
     val haptics = rememberHaptics()
     val pressSource = remember { MutableInteractionSource() }
     val isPressed by pressSource.collectIsPressedAsState()
@@ -368,6 +379,12 @@ private fun GlassNowPlaying(
                 onClick = onExpand,
             ),
     ) {
+        if (honor) {
+            HonorGlassLayer(
+                modifier = Modifier.matchParentSize(),
+                onDarkChanged = { glassDark = it },
+            )
+        }
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier

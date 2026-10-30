@@ -360,23 +360,31 @@ private fun ArtworkPageBackButton(
     val shape = CircleShape
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
     val useLiquidGlass = LocalLiquidGlassEnabled.current && isGlassSupported()
-    val contentColor = if (useLiquidGlass && !reduceDynamicBlur) {
+    val honor = rememberHonorGlass()
+    val contentColor = if ((useLiquidGlass || honor) && !reduceDynamicBlur) {
         glassContentColor()
     } else {
         MaterialTheme.colorScheme.onSurface
     }
 
-    IconButton(
-        onClick = onClick,
+    Box(
         modifier = modifier
             .size(TOP_CONTROL_SIZE)
             .then(artworkPageSurface(shape = shape, hazeState = hazeState)),
+        contentAlignment = Alignment.Center,
     ) {
-        Icon(
-            SfIcons.ArrowBack,
-            contentDescription = stringResource(R.string.back),
-            tint = contentColor,
-        )
+        if (honor) {
+            HonorGlassLayer(
+                modifier = Modifier.matchParentSize(),
+            )
+        }
+        IconButton(onClick = onClick, modifier = Modifier.size(TOP_CONTROL_SIZE)) {
+            Icon(
+                SfIcons.ArrowBack,
+                contentDescription = stringResource(R.string.back),
+                tint = contentColor,
+            )
+        }
     }
 }
 
@@ -387,18 +395,37 @@ private fun ArtworkPageActions(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
+    val honor = rememberHonorGlass()
+    // Keep the right edge fixed while a new action opens room to its
+    // left. The surface itself therefore grows instead of jumping to
+    // its new width in a single frame.
+    val grow = Modifier.animateContentSize(
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMediumLow,
+        ),
+    )
+    if (honor) {
+        Box(
+            modifier = modifier
+                .then(artworkPageSurface(shape = CircleShape, hazeState = hazeState))
+                .then(grow),
+        ) {
+            HonorGlassLayer(
+                modifier = Modifier.matchParentSize(),
+            )
+            ActionsRow(modifier = Modifier.artworkActionEdgePadding()) {
+                CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides TOP_CONTROL_SIZE) {
+                    content()
+                }
+            }
+        }
+        return
+    }
     ActionsRow(
         modifier = modifier
             .then(artworkPageSurface(shape = CircleShape, hazeState = hazeState))
-            // Keep the right edge fixed while a new action opens room to its
-            // left. The surface itself therefore grows instead of jumping to
-            // its new width in a single frame.
-            .animateContentSize(
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioNoBouncy,
-                    stiffness = Spring.StiffnessMediumLow,
-                ),
-            )
+            .then(grow)
             // One profile target with no inset is a true circle, the back
             // button's size. Once another action exists, Apple's inset opens at
             // both ends. This is layout padding inside the surface, not an
@@ -525,11 +552,13 @@ private fun artworkPageSurface(
     val container = MaterialTheme.colorScheme.surface
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
     val useLiquidGlass = LocalLiquidGlassEnabled.current && isGlassSupported()
+    val honor = rememberHonorGlass()
 
     return Modifier
         .clip(shape)
         .then(
             when {
+                honor -> Modifier
                 useLiquidGlass -> Modifier.liquidGlass(shape)
                 reduceDynamicBlur || hazeState == null -> Modifier.background(container)
                 else -> Modifier.optimizedHazeEffect(

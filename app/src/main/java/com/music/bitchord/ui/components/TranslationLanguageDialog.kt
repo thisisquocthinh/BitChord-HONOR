@@ -114,13 +114,18 @@ fun TranslationLanguageDialog(
             ),
         contentAlignment = Alignment.Center,
     ) {
-        Column(
+        val honor = rememberHonorGlass()
+        GlassColumn(
+            honor = honor,
+            radius = ALERT_CORNER,
             modifier = Modifier
                 .width(ALERT_WIDTH)
                 .clip(shape)
                 .then(
                     if (reduceDynamicBlur) {
                         Modifier.background(MaterialTheme.colorScheme.surface)
+                    } else if (honor) {
+                        Modifier
                     } else {
                         Modifier.optimizedHazeEffect(
                             state = hazeState,

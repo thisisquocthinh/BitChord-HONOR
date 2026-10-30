@@ -88,3 +88,7 @@
 -dontwarn org.conscrypt.**
 -dontwarn com.android.org.conscrypt.**
 -dontwarn io.github.muntashirakon.adb.**
+
+# HONOR Translucent Component Kit (loaded by reflection from the system on HONOR devices)
+-keep class com.hihonor.uikit.** { *; }
+-dontwarn com.hihonor.uikit.**

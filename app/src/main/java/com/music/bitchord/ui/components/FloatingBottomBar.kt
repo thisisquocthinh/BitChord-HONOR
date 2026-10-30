@@ -46,6 +46,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
@@ -185,7 +186,9 @@ fun FloatingBottomBar(
     val pillShape = RoundedCornerShape(percent = 50)
     val container = MaterialTheme.colorScheme.surface
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
-    val useGlass = LocalLiquidGlassEnabled.current && isGlassSupported()
+    val honor = isHonorGlassSupported(LocalContext.current) && !reduceDynamicBlur
+    var honorDark by remember { mutableStateOf(false) }
+    val useGlass = honor || (LocalLiquidGlassEnabled.current && isGlassSupported())
     val reduceAnimation by AppSettings.reduceAnimation.collectAsStateWithLifecycle()
     // The glass settle is exactly the motion "reduce animation" promises to
     // drop — snapping both the indicator's travel and the glyph's pop to
@@ -193,6 +196,13 @@ fun FloatingBottomBar(
     val glassSpec: AnimationSpec<Float> = if (reduceAnimation) snap() else GlassSpring
 
     var dragOffset by remember { mutableFloatStateOf(0f) }
+    // Finger on the indicator: it lifts into a bigger, clearer lens, as in HONOR's own tab bars.
+    var lifted by remember { mutableStateOf(false) }
+    val lift by animateFloatAsState(
+        targetValue = if (lifted) 1f else 0f,
+        animationSpec = glassSpec,
+        label = "lensLift",
+    )
     val haptics = rememberHaptics()
     val density = LocalDensity.current
     val currentSelectedIndex by rememberUpdatedState(selectedIndex)
@@ -256,6 +266,8 @@ fun FloatingBottomBar(
             .then(
                 if (reduceDynamicBlur) {
                     Modifier.background(container)
+                } else if (honor) {
+                    Modifier
                 } else if (useGlass) {
                     Modifier.liquidGlass(shape = pillShape)
                 } else {
@@ -265,9 +277,15 @@ fun FloatingBottomBar(
                     )
                 },
             )
-            .border(GLASS_EDGE_WIDTH, GLASS_EDGE_COLOR, pillShape)
-            .padding(horizontal = PILL_INSET, vertical = PILL_INSET),
+            .then(if (honor) Modifier else Modifier.border(GLASS_EDGE_WIDTH, GLASS_EDGE_COLOR, pillShape)),
     ) {
+        if (honor) {
+            HonorGlassLayer(
+                modifier = Modifier.matchParentSize(),
+                onDarkChanged = { honorDark = it },
+            )
+        }
+        Box(modifier = Modifier.padding(horizontal = PILL_INSET, vertical = PILL_INSET)) {
         if (tabWidthPx > 0f) {
             Box(
                 modifier = Modifier
@@ -280,11 +298,33 @@ fun FloatingBottomBar(
                         // a leading edge that ran ahead of the glyph it is
                         // meant to be behind would read as two things moving,
                         // not one thing stretching.
-                        scaleX = 1f + lag * STRETCH
-                        scaleY = 1f - lag * STRETCH * SQUASH
+                        scaleX = (1f + lag * STRETCH) * (1f + 0.12f * lift)
+                        scaleY = (1f - lag * STRETCH * SQUASH) * (1f + 0.10f * lift)
                     }
                     .clip(pillShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
+                    .then(
+                        if (honor) {
+                            // HONOR's lens: a faint see-through pill with a thin
+                            // light rim at rest, a clearer one with a bright rim
+                            // while held.
+                            val rim = if (honorDark) Color.White else Color.White.copy(alpha = 0.9f)
+                            Modifier
+                                .background(
+                                    if (honorDark) {
+                                        Color.White.copy(alpha = 0.15f - 0.07f * lift)
+                                    } else {
+                                        Color(0xFF0F172A).copy(alpha = 0.08f - 0.03f * lift)
+                                    },
+                                )
+                                .border(
+                                    (1f + 0.5f * lift).dp,
+                                    rim.copy(alpha = rim.alpha * (0.25f + 0.55f * lift)),
+                                    pillShape,
+                                )
+                        } else {
+                            Modifier.background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f))
+                        },
+                    ),
             )
         }
 
@@ -301,11 +341,13 @@ fun FloatingBottomBar(
                     var dragStartIndex = currentSelectedIndex
                     detectHorizontalDragGestures(
                         onDragStart = {
+                            lifted = true
                             totalDrag = 0f
                             dragStartIndex = currentSelectedIndex
                         },
-                        onDragCancel = { dragOffset = 0f },
+                        onDragCancel = { dragOffset = 0f; lifted = false },
                         onDragEnd = {
+                            lifted = false
                             val step = currentTabStepPx
                             if (step > 0f) {
                                 val absoluteIndexFloat = (dragStartIndex + totalDrag / step)
@@ -341,7 +383,7 @@ fun FloatingBottomBar(
             // contrast against it. Glass mode reads luminance off the surface
             // color instead and picks pure black or white, same as the tint
             // Echo's floating nav bar uses for its own liquid glass.
-            val glassTint = glassContentColor()
+            val glassTint = if (honor) (if (honorDark) Color.White else Color.Black) else glassContentColor()
             val adaptiveTint = if (useGlass) glassTint else null
             tabs.forEachIndexed { index, tab ->
                 BottomBarItem(
@@ -354,6 +396,7 @@ fun FloatingBottomBar(
                     modifier = Modifier.weight(1f),
                 )
             }
+        }
         }
     }
 }
