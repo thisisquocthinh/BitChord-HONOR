@@ -9,6 +9,10 @@
 
 ### Aesthetic YouTube Music Client
 
+> **BitChord-HONOR** is an unofficial fork of [BitChord](https://github.com/kushagrasinghx/BitChord) by Kushagra Singh, licensed under GPL-3.0.
+> It adds HONOR's translucent liquid-glass widgets (HONOR Translucent Component Kit) to the navigation bar, mini player, top controls and dialogs on supported HONOR phones; every other device keeps BitChord's own glass. It is not affiliated with or endorsed by the original author.
+> The bundled `app/libs/hnvisualeffect-*.aar` is HONOR's SDK and stays under HONOR's own terms, not GPL-3.0.
+
 <br/>
 
 [![Latest release](https://img.shields.io/github/v/release/kushagrasinghx/BitChord?style=for-the-badge&labelColor=0d1117)](https://github.com/kushagrasinghx/BitChord/releases)

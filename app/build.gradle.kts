@@ -172,7 +172,7 @@ android {
             )
             // Null without a keystore to sign with: the build then produces
             // app-release-unsigned.apk instead of failing outright.
-            // shortcut: no release keystore on this fork, so sign with the debug key; replace before any store release.
+            // Falls back to the debug key only when no keystore.properties is present (local dev builds).
             signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
         /*
